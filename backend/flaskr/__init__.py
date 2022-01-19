@@ -123,17 +123,17 @@ def create_app(test_config=None):
     def add_question():
         body = request.get_json()
 
-        if not ('question' in body and 'answer' in body and 'difficulty' in body and 'category' in body):
+        question = body.get('question')
+        answer = body.get('answer')
+        difficulty = body.get('difficulty')
+        category = body.get('category')
+
+        if not question or not answer or not difficulty or not category:
             abort(422)
-
-        new_question = body.get('question')
-        new_answer = body.get('answer')
-        new_difficulty = body.get('difficulty')
-        new_category = body.get('category')
-
+        
         try:
-            question = Question(question=new_question, answer=new_answer,
-                                difficulty=new_difficulty, category=new_category)
+            question = Question(question=question, answer=answer,
+                                difficulty=difficulty, category=category)
             question.insert()
 
             return jsonify({
@@ -159,17 +159,19 @@ def create_app(test_config=None):
         body = request.get_json()
         search_term = body.get('searchTerm', None)
 
-        if search_term:
-            search_results = Question.query.filter(
-                Question.question.ilike(f'%{search_term}%')).all()
+        if not search_term:
+            abort(404)
+        
+        search_results = Question.query.filter(
+            Question.question.ilike(f'%{search_term}%')).all()
 
-            return jsonify({
-                'success': True,
-                'questions': [question.format() for question in search_results],
-                'total_questions': len(search_results),
-                'current_category': None
-            })
-        abort(404)
+        return jsonify({
+            'success': True,
+            'questions': [question.format() for question in search_results],
+            'total_questions': len(search_results),
+            'current_category': None
+        })
+
     """
     @TODO:
     Create a GET endpoint to get questions based on category.
@@ -210,12 +212,11 @@ def create_app(test_config=None):
         try:
 
             body = request.get_json()
-
-            if not ('quiz_category' in body and 'previous_questions' in body):
-                abort(422)
-
             category = body.get('quiz_category')
             previous_questions = body.get('previous_questions')
+
+            if not category or not previous_questions:
+                abort(422)
 
             if category['type'] == 'click':
                 available_questions = Question.query.filter(
@@ -224,8 +225,10 @@ def create_app(test_config=None):
                 available_questions = Question.query.filter_by(
                     category=category['id']).filter(Question.id.notin_((previous_questions))).all()
 
-            new_question = available_questions[random.randrange(
-                0, len(available_questions))].format() if len(available_questions) > 0 else None
+            if len(available_questions) > 0:
+                new_question = available_questions[random.randrange(0, len(available_questions))].format()
+            else:
+                new_question = None
 
             return jsonify({
                 'success': True,
